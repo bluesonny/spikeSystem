@@ -1,6 +1,8 @@
 package main
 
 import (
+	"github.com/gomodule/redigo/redis"
+	"log"
 	"net/http"
 	"os"
 	localSpike2 "spikeSystem/localSpike"
@@ -8,21 +10,19 @@ import (
 	"spikeSystem/util"
 	"strconv"
 	"strings"
-
-	"github.com/garyburd/redigo/redis"
 )
 
 var (
-	localSpike localSpike2.LocalSpike
+	localSpike  localSpike2.LocalSpike
 	remoteSpike remoteSpike2.RemoteSpikeKeys
-	redisPool *redis.Pool
-	done chan int
+	redisPool   *redis.Pool
+	done        chan int
 )
 
 //初始化要使用的结构体和redis连接池
 func init() {
 	localSpike = localSpike2.LocalSpike{
-		LocalInStock:     150,
+		LocalInStock:     1000,
 		LocalSalesVolume: 0,
 	}
 	remoteSpike = remoteSpike2.RemoteSpikeKeys{
@@ -31,11 +31,14 @@ func init() {
 		QuantityOfOrderKey: "ticket_sold_nums",
 	}
 	redisPool = remoteSpike2.NewPool()
+	//log.Printf("连接成功了么%v", redisPool)
 	done = make(chan int, 1)
 	done <- 1
 }
 
 func main() {
+
+	log.Printf("开始...")
 	http.HandleFunc("/buy/ticket", handleReq)
 	http.ListenAndServe(":3005", nil)
 }
@@ -46,12 +49,16 @@ func handleReq(w http.ResponseWriter, r *http.Request) {
 	LogMsg := ""
 	<-done
 	//全局读写锁
-	if localSpike.LocalDeductionStock() && remoteSpike.RemoteDeductionStock(redisConn) {
-		util.RespJson(w, 1,  "抢票成功", nil)
-		LogMsg = LogMsg + "result:1,localSales:" + strconv.FormatInt(localSpike.LocalSalesVolume, 10)
-	} else {
+	ret := false
+	if localSpike.LocalDeductionStock() {
+		ret = remoteSpike.RemoteDeductionStock(redisConn)
+	}
+	if !ret {
 		util.RespJson(w, -1, "已售罄", nil)
 		LogMsg = LogMsg + "result:0,localSales:" + strconv.FormatInt(localSpike.LocalSalesVolume, 10)
+	} else {
+		util.RespJson(w, 1, "抢票成功", nil)
+		LogMsg = LogMsg + "result:1,localSales:" + strconv.FormatInt(localSpike.LocalSalesVolume, 10)
 	}
 	//将抢票状态写入到log中
 	done <- 1
