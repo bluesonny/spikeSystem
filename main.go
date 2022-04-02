@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	localSpike2 "spikeSystem/localSpike"
+	. "spikeSystem/model"
 	remoteSpike2 "spikeSystem/remoteSpike"
 	"spikeSystem/util"
 	"strconv"
@@ -22,7 +23,7 @@ var (
 //初始化要使用的结构体和redis连接池
 func init() {
 	localSpike = localSpike2.LocalSpike{
-		LocalInStock:     1000,
+		LocalInStock:     30,
 		LocalSalesVolume: 0,
 	}
 	remoteSpike = remoteSpike2.RemoteSpikeKeys{
@@ -30,7 +31,7 @@ func init() {
 		TotalInventoryKey:  "ticket_total_nums",
 		QuantityOfOrderKey: "ticket_sold_nums",
 	}
-	redisPool = remoteSpike2.NewPool()
+	redisPool = NewPool()
 	//log.Printf("连接成功了么%v", redisPool)
 	done = make(chan int, 1)
 	done <- 1
@@ -62,7 +63,8 @@ func handleReq(w http.ResponseWriter, r *http.Request) {
 	}
 	//将抢票状态写入到log中
 	done <- 1
-	writeLog(LogMsg, "./stat.log")
+	//writeLog(LogMsg, "./stat.log")
+	log.Printf(LogMsg)
 }
 
 func writeLog(msg string, logPath string) {
